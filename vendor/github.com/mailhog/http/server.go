@@ -16,6 +16,8 @@ import (
 // Authorised should be given a function to enable HTTP Basic Authentication
 var Authorised func(string, string) bool
 var users map[string]string
+var basicAuthUser string
+var basicAuthPass string
 
 // AuthFile sets Authorised to a function which validates against file
 func AuthFile(file string) {
@@ -71,6 +73,24 @@ func AuthFile(file string) {
 		}
 
 		return true
+	}
+}
+
+// AuthBasic sets Authorised to a function which validates against username:password
+func AuthBasic(credentials string) {
+	parts := strings.SplitN(credentials, ":", 2)
+	if len(parts) != 2 {
+		log.Fatalf("[HTTP] Invalid MH_AUTHORIZATION_BASIC format, expected username:password")
+		os.Exit(1)
+	}
+	
+	basicAuthUser = parts[0]
+	basicAuthPass = parts[1]
+	
+	log.Printf("[HTTP] Basic authentication enabled for user: %s", basicAuthUser)
+	
+	Authorised = func(u, pw string) bool {
+		return u == basicAuthUser && pw == basicAuthPass
 	}
 }
 

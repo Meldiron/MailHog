@@ -78,6 +78,10 @@ func main() {
 		http.AuthFile(comconf.AuthFile)
 	}
 
+	if comconf.AuthBasic != "" {
+		http.AuthBasic(comconf.AuthBasic)
+	}
+
 	exitCh = make(chan int)
 	if uiconf.UIBindAddr == apiconf.APIBindAddr {
 		cb := func(r gohttp.Handler) {
