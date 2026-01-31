@@ -60,7 +60,7 @@ export function decodeBase64(encoded: string): string {
 
 export function decodeContent(content: string, encoding: string): string {
   const normalizedEncoding = encoding.toLowerCase().trim()
-  
+
   switch (normalizedEncoding) {
     case 'quoted-printable':
       return decodeQuotedPrintable(content)
@@ -72,4 +72,32 @@ export function decodeContent(content: string, encoding: string): string {
     default:
       return content
   }
+}
+
+// Decode HTML entities like &#xa0; &#x200C; etc.
+export function decodeHtmlEntities(text: string): string {
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = text
+  return textarea.value
+}
+
+// Remove zero-width and invisible characters for readable plain text
+export function stripInvisibleChars(text: string): string {
+  return text
+    // Remove zero-width characters
+    .replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '')
+    // Replace non-breaking spaces with regular spaces
+    .replace(/\u00A0/g, ' ')
+    // Collapse multiple spaces into one
+    .replace(/  +/g, ' ')
+    // Clean up multiple blank lines
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// Get clean, readable plain text
+export function getReadableText(content: string, encoding: string): string {
+  const decoded = decodeContent(content, encoding)
+  const withEntitiesDecoded = decodeHtmlEntities(decoded)
+  return stripInvisibleChars(withEntitiesDecoded)
 }

@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useMessage, useDeleteMessage } from '@/hooks/use-messages'
 import { useUIStore } from '@/stores/ui-store'
-import { formatDate, decodeContent } from '@/lib/utils'
+import { formatDate, decodeContent, getReadableText, decodeHtmlEntities } from '@/lib/utils'
 import type { Message, MIMEPart } from '@/api/types'
 
 function DetailSkeleton() {
@@ -181,16 +181,22 @@ function getSubject(message: Message): string {
   return headers['Subject']?.[0] || headers['subject']?.[0] || '(No Subject)'
 }
 
-function getPlainTextBody(message: Message): string {
+function getPlainTextBody(message: Message, readable: boolean = true): string {
   if (message.MIME?.Parts) {
     const plainPart = findMimePart(message.MIME.Parts, 'text/plain')
     if (plainPart) {
       const encoding = plainPart.Headers['Content-Transfer-Encoding']?.[0] || ''
-      return decodeContent(plainPart.Body, encoding)
+      if (readable) {
+        return getReadableText(plainPart.Body, encoding)
+      }
+      return decodeHtmlEntities(decodeContent(plainPart.Body, encoding))
     }
   }
   const encoding = message.Content.Headers['Content-Transfer-Encoding']?.[0] || ''
-  return decodeContent(message.Content.Body, encoding)
+  if (readable) {
+    return getReadableText(message.Content.Body, encoding)
+  }
+  return decodeHtmlEntities(decodeContent(message.Content.Body, encoding))
 }
 
 function getHtmlBody(message: Message): string | null {
@@ -282,7 +288,8 @@ export function MessageDetail() {
   const fromEmail = getFromEmail(message)
   const toEmails = getToEmails(message)
   const subject = getSubject(message)
-  const plainText = getPlainTextBody(message)
+  const plainText = getPlainTextBody(message, true)  // Readable, cleaned up
+  const rawText = getPlainTextBody(message, false)   // Decoded but not stripped
   const htmlBody = getHtmlBody(message)
 
   const handleDownload = () => {
@@ -378,34 +385,41 @@ export function MessageDetail() {
         </div>
       </div>
 
-      <Tabs defaultValue="plain" className="flex-1 flex flex-col min-h-0">
+      <Tabs defaultValue={htmlBody ? "html" : "plain"} className="flex-1 flex flex-col min-h-0">
         <div className="px-4 pt-2">
           <TabsList>
-            <TabsTrigger value="plain">Plain</TabsTrigger>
             {htmlBody && <TabsTrigger value="html">HTML</TabsTrigger>}
-            <TabsTrigger value="headers">Headers</TabsTrigger>
+            <TabsTrigger value="plain">Plain</TabsTrigger>
             <TabsTrigger value="raw">Raw</TabsTrigger>
+            <TabsTrigger value="headers">Headers</TabsTrigger>
+            <TabsTrigger value="source">Source</TabsTrigger>
           </TabsList>
         </div>
 
         <ScrollArea className="flex-1">
-          <TabsContent value="plain" className="p-4 mt-0">
-            <pre className="whitespace-pre-wrap font-mono text-sm break-words">
-              {plainText}
-            </pre>
-          </TabsContent>
-
           {htmlBody && (
             <TabsContent value="html" className="p-4 mt-0">
               <HtmlPreview html={htmlBody} />
             </TabsContent>
           )}
 
+          <TabsContent value="plain" className="p-4 mt-0">
+            <pre className="whitespace-pre-wrap font-mono text-sm break-words">
+              {plainText}
+            </pre>
+          </TabsContent>
+
+          <TabsContent value="raw" className="p-4 mt-0">
+            <pre className="whitespace-pre-wrap font-mono text-sm break-words bg-muted p-4 rounded-md">
+              {rawText}
+            </pre>
+          </TabsContent>
+
           <TabsContent value="headers" className="p-4 mt-0">
             <HeadersView message={message} />
           </TabsContent>
 
-          <TabsContent value="raw" className="p-4 mt-0">
+          <TabsContent value="source" className="p-4 mt-0">
             <pre className="whitespace-pre-wrap font-mono text-xs break-all bg-muted p-4 rounded-md overflow-x-auto">
               {message.Raw.Data}
             </pre>
