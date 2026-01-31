@@ -3,14 +3,14 @@ FROM node:18-alpine as build
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files from dashboard directory
+COPY dashboard/package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy dashboard source code
+COPY dashboard/ ./
 
 # Build the application
 RUN npm run build
