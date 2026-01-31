@@ -1,0 +1,38 @@
+const API_BASE_URL = 'https://appwrite-mailhog.up.railway.app'
+const AUTH_HEADER = 'Basic cm9vdDphcHB3cml0ZWhvZw=='
+
+export async function apiClient<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`
+
+  const headers: HeadersInit = {
+    'Authorization': AUTH_HEADER,
+    'Content-Type': 'application/json',
+    ...options.headers,
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  })
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`)
+  }
+
+  if (response.status === 204) {
+    return {} as T
+  }
+
+  return response.json()
+}
+
+export function getWebSocketUrl(): string {
+  const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss' : 'ws'
+  const baseWithoutProtocol = API_BASE_URL.replace(/^https?:\/\//, '')
+  return `${wsProtocol}://${baseWithoutProtocol}/api/v2/websocket`
+}
+
+export { API_BASE_URL, AUTH_HEADER }
