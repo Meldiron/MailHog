@@ -109,10 +109,22 @@ export function useAutoRefresh() {
   const { notificationsEnabled, searchQuery, searchKind } = useUIStore()
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastMessageCountRef = useRef<number>(0)
+  
+  // Use refs to store current values to avoid recreating the callback
+  const searchQueryRef = useRef(searchQuery)
+  const searchKindRef = useRef(searchKind)
+  const notificationsEnabledRef = useRef(notificationsEnabled)
+  
+  // Update refs when values change using useEffect
+  useEffect(() => {
+    searchQueryRef.current = searchQuery
+    searchKindRef.current = searchKind
+    notificationsEnabledRef.current = notificationsEnabled
+  }, [searchQuery, searchKind, notificationsEnabled])
 
   const showNotification = useCallback(
     (message: Message) => {
-      if (!notificationsEnabled) return
+      if (!notificationsEnabledRef.current) return
       if (!('Notification' in window)) return
       if (Notification.permission !== 'granted') return
 
@@ -128,21 +140,24 @@ export function useAutoRefresh() {
         tag: message.ID,
       })
     },
-    [notificationsEnabled]
+    [] // No dependencies - we use the ref instead
   )
 
+  // Create a stable callback that doesn't change
   const checkForNewMessages = useCallback(async () => {
     console.log('[AutoRefresh] Checking for new messages...')
     try {
-      const currentData = queryClient.getQueryData(['messages', searchQuery, searchKind]) as 
+      const currentSearchQuery = searchQueryRef.current
+      const currentSearchKind = searchKindRef.current
+      const currentData = queryClient.getQueryData(['messages', currentSearchQuery, currentSearchKind]) as 
         { total: number; count: number; start: number; items: Message[] } | undefined
 
       // Fetch fresh data
       let freshData
       try {
-        if (searchQuery.trim()) {
-          console.log('[AutoRefresh] Fetching search results for:', searchQuery)
-          freshData = await searchMessages(searchKind, searchQuery)
+        if (currentSearchQuery.trim()) {
+          console.log('[AutoRefresh] Fetching search results for:', currentSearchQuery)
+          freshData = await searchMessages(currentSearchKind, currentSearchQuery)
         } else {
           console.log('[AutoRefresh] Fetching all messages')
           freshData = await getMessages(0, 50)
@@ -158,7 +173,7 @@ export function useAutoRefresh() {
         // If no current data, just update cache
         console.log('[AutoRefresh] No current data, initializing cache')
         try {
-          queryClient.setQueryData(['messages', searchQuery, searchKind], freshData)
+          queryClient.setQueryData(['messages', currentSearchQuery, currentSearchKind], freshData)
           lastMessageCountRef.current = freshData.total
         } catch (cacheError) {
           console.error('[AutoRefresh] Cache update failed:', cacheError)
@@ -194,7 +209,7 @@ export function useAutoRefresh() {
 
         // Update cache with fresh data
         try {
-          queryClient.setQueryData(['messages', searchQuery, searchKind], freshData)
+          queryClient.setQueryData(['messages', currentSearchQuery, currentSearchKind], freshData)
           lastMessageCountRef.current = freshData.total
         } catch (cacheError) {
           console.error('[AutoRefresh] Cache update failed:', cacheError)
@@ -216,7 +231,7 @@ export function useAutoRefresh() {
     } catch (error) {
       console.error('[AutoRefresh] Critical error - continuing anyway:', error)
     }
-  }, [queryClient, searchQuery, searchKind, showNotification])
+  }, [queryClient, showNotification]) // Only depend on stable values
 
   useEffect(() => {
     try {
@@ -251,7 +266,7 @@ export function useAutoRefresh() {
 export function useAddMessageToCache() {
   const queryClient = useQueryClient()
 
-  return (message: Message) => {
+  return useCallback((message: Message) => {
     queryClient.setQueryData(
       ['messages', '', 'containing'],
       (old: { total: number; count: number; start: number; items: Message[] } | undefined) => {
@@ -266,5 +281,5 @@ export function useAddMessageToCache() {
         }
       }
     )
-  }
+  }, [queryClient])
 }

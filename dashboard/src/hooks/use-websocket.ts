@@ -10,16 +10,33 @@ const MAX_RECONNECT_ATTEMPTS = 10
 
 export function useWebSocket() {
   const queryClient = useQueryClient()
-  const { setIsConnected, notificationsEnabled, searchQuery, searchKind } = useUIStore()
+  // Use selectors for stable references
+  const setIsConnected = useUIStore(state => state.setIsConnected)
+  const notificationsEnabled = useUIStore(state => state.notificationsEnabled)
+  const searchQuery = useUIStore(state => state.searchQuery)
+  const searchKind = useUIStore(state => state.searchKind)
+
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttempts = useRef(0)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const addMessageToCache = useAddMessageToCache()
 
+  // Use refs to store current values to avoid recreating callbacks
+  const searchQueryRef = useRef(searchQuery)
+  const searchKindRef = useRef(searchKind)
+  const notificationsEnabledRef = useRef(notificationsEnabled)
+
+  // Update refs when values change using useEffect
+  useEffect(() => {
+    searchQueryRef.current = searchQuery
+    searchKindRef.current = searchKind
+    notificationsEnabledRef.current = notificationsEnabled
+  }, [searchQuery, searchKind, notificationsEnabled])
+
   const showNotification = useCallback(
     (message: Message) => {
       try {
-        if (!notificationsEnabled) return
+        if (!notificationsEnabledRef.current) return
         if (!('Notification' in window)) return
         if (Notification.permission !== 'granted') return
 
@@ -38,15 +55,18 @@ export function useWebSocket() {
         console.error('[WebSocket] Notification error:', error)
       }
     },
-    [notificationsEnabled]
+    [] // No dependencies - we use the ref instead
   )
 
   const updateMessageCache = useCallback(
     (message: Message) => {
       try {
-        // Update cache for current query
+        // Update cache for current query using refs
+        const currentSearchQuery = searchQueryRef.current
+        const currentSearchKind = searchKindRef.current
+        
         queryClient.setQueryData(
-          ['messages', searchQuery, searchKind],
+          ['messages', currentSearchQuery, currentSearchKind],
           (
             old:
               | { total: number; count: number; start: number; items: Message[] }
@@ -80,9 +100,12 @@ export function useWebSocket() {
         console.error('[WebSocket] Cache update error:', error)
       }
     },
-    [queryClient, searchQuery, searchKind, addMessageToCache]
+    [queryClient, addMessageToCache] // Removed searchQuery and searchKind dependencies
   )
 
+  // Use a ref to store the connect function to avoid circular dependency
+  const connectRef = useRef<(() => void) | undefined>(undefined)
+  
   const connect = useCallback(() => {
     try {
       // Check if WebSocket is supported
@@ -125,7 +148,7 @@ export function useWebSocket() {
             reconnectAttempts.current++
             console.log('[WebSocket] Scheduling reconnect attempt', reconnectAttempts.current, 'in', RECONNECT_INTERVAL, 'ms')
             reconnectTimeoutRef.current = setTimeout(() => {
-              connect()
+              connectRef.current?.()
             }, RECONNECT_INTERVAL)
           } else {
             console.log('[WebSocket] Max reconnect attempts reached, giving up')
@@ -171,6 +194,11 @@ export function useWebSocket() {
       }
     }
   }, [setIsConnected, updateMessageCache, showNotification])
+  
+  // Store connect function in ref using useEffect
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
 
   const disconnect = useCallback(() => {
     try {
@@ -193,42 +221,29 @@ export function useWebSocket() {
     // Add delay to prevent immediate connection attempts that might crash
     const timeoutId = setTimeout(() => {
       try {
-        connect()
+        connectRef.current?.()
       } catch (error) {
         console.error('[WebSocket] Error in useEffect:', error)
-        try {
-          setIsConnected(false)
-        } catch (err) {
-          console.error('[WebSocket] Failed to set disconnected state:', err)
-        }
+        setIsConnected(false)
       }
     }, 1000) // 1 second delay
 
     return () => {
       clearTimeout(timeoutId)
       try {
-        disconnect()
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current)
+          reconnectTimeoutRef.current = null
+        }
+        if (wsRef.current) {
+          wsRef.current.close()
+          wsRef.current = null
+        }
       } catch (error) {
         console.error('[WebSocket] Error in cleanup:', error)
       }
     }
-  }, [connect, disconnect, setIsConnected])
+  }, [setIsConnected])
 
-  return { 
-    connect: () => {
-      try {
-        connect()
-      } catch (error) {
-        console.error('[WebSocket] Error in manual connect:', error)
-        setIsConnected(false)
-      }
-    }, 
-    disconnect: () => {
-      try {
-        disconnect()
-      } catch (error) {
-        console.error('[WebSocket] Error in manual disconnect:', error)
-      }
-    }
-  }
+  return { connect, disconnect }
 }
