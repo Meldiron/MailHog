@@ -18,99 +18,130 @@ export function useWebSocket() {
 
   const showNotification = useCallback(
     (message: Message) => {
-      if (!notificationsEnabled) return
-      if (!('Notification' in window)) return
-      if (Notification.permission !== 'granted') return
+      try {
+        if (!notificationsEnabled) return
+        if (!('Notification' in window)) return
+        if (Notification.permission !== 'granted') return
 
-      const fromEmail = `${message.From.Mailbox}@${message.From.Domain}`
-      const subject =
-        message.Content.Headers['Subject']?.[0] ||
-        message.Content.Headers['subject']?.[0] ||
-        '(No Subject)'
+        const fromEmail = `${message.From.Mailbox}@${message.From.Domain}`
+        const subject =
+          message.Content.Headers['Subject']?.[0] ||
+          message.Content.Headers['subject']?.[0] ||
+          '(No Subject)'
 
-      new Notification('New Email', {
-        body: `From: ${fromEmail}\n${subject}`,
-        icon: '/mailhog.svg',
-        tag: message.ID,
-      })
+        new Notification('New Email', {
+          body: `From: ${fromEmail}\n${subject}`,
+          icon: '/mailhog.svg',
+          tag: message.ID,
+        })
+      } catch (error) {
+        console.error('[WebSocket] Notification error:', error)
+      }
     },
     [notificationsEnabled]
   )
 
   const updateMessageCache = useCallback(
     (message: Message) => {
-      // Update cache for current query
-      queryClient.setQueryData(
-        ['messages', searchQuery, searchKind],
-        (
-          old:
-            | { total: number; count: number; start: number; items: Message[] }
-            | undefined
-        ) => {
-          if (!old) {
+      try {
+        // Update cache for current query
+        queryClient.setQueryData(
+          ['messages', searchQuery, searchKind],
+          (
+            old:
+              | { total: number; count: number; start: number; items: Message[] }
+              | undefined
+          ) => {
+            if (!old) {
+              return {
+                total: 1,
+                count: 1,
+                start: 0,
+                items: [message],
+              }
+            }
+            const exists = old.items.some((m) => m.ID === message.ID)
+            if (exists) return old
             return {
-              total: 1,
-              count: 1,
-              start: 0,
-              items: [message],
+              ...old,
+              total: old.total + 1,
+              count: old.count + 1,
+              items: [message, ...old.items],
             }
           }
-          const exists = old.items.some((m) => m.ID === message.ID)
-          if (exists) return old
-          return {
-            ...old,
-            total: old.total + 1,
-            count: old.count + 1,
-            items: [message, ...old.items],
-          }
-        }
-      )
+        )
 
-      // Also update the default query (no search)
-      addMessageToCache(message)
-      
-      // Invalidate all message queries to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ['messages'] })
+        // Also update the default query (no search)
+        addMessageToCache(message)
+        
+        // Invalidate all message queries to ensure consistency
+        queryClient.invalidateQueries({ queryKey: ['messages'] })
+      } catch (error) {
+        console.error('[WebSocket] Cache update error:', error)
+      }
     },
     [queryClient, searchQuery, searchKind, addMessageToCache]
   )
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
-
-    const wsUrl = getWebSocketUrl()
-    console.log('[WebSocket] Attempting to connect to:', wsUrl)
-
-    const urlWithAuth = new URL(wsUrl)
-
     try {
-      const ws = new WebSocket(urlWithAuth.toString())
-
-      ws.onopen = () => {
-        console.log('[WebSocket] Connection established successfully')
-        setIsConnected(true)
-        reconnectAttempts.current = 0
+      // Check if WebSocket is supported
+      if (typeof WebSocket === 'undefined') {
+        console.warn('[WebSocket] WebSocket not supported in this browser')
+        setIsConnected(false)
+        return
       }
 
-      ws.onclose = () => {
-        console.log('[WebSocket] Connection closed, reconnect attempts:', reconnectAttempts.current)
-        setIsConnected(false)
-        wsRef.current = null
+      if (wsRef.current?.readyState === WebSocket.OPEN) return
 
-        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-          reconnectAttempts.current++
-          console.log('[WebSocket] Scheduling reconnect attempt', reconnectAttempts.current, 'in', RECONNECT_INTERVAL, 'ms')
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connect()
-          }, RECONNECT_INTERVAL)
-        } else {
-          console.log('[WebSocket] Max reconnect attempts reached, giving up')
+      const wsUrl = getWebSocketUrl()
+      console.log('[WebSocket] Attempting to connect to:', wsUrl)
+
+      if (!wsUrl || wsUrl.trim() === '' || (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://'))) {
+        console.error('[WebSocket] Invalid WebSocket URL:', wsUrl)
+        setIsConnected(false)
+        return
+      }
+
+      const ws = new WebSocket(wsUrl)
+
+      ws.onopen = () => {
+        try {
+          console.log('[WebSocket] Connection established successfully')
+          setIsConnected(true)
+          reconnectAttempts.current = 0
+        } catch (error) {
+          console.error('[WebSocket] Error in onopen handler:', error)
+        }
+      }
+
+      ws.onclose = (event) => {
+        try {
+          console.log('[WebSocket] Connection closed, code:', event.code, 'reason:', event.reason)
+          setIsConnected(false)
+          wsRef.current = null
+
+          if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts.current++
+            console.log('[WebSocket] Scheduling reconnect attempt', reconnectAttempts.current, 'in', RECONNECT_INTERVAL, 'ms')
+            reconnectTimeoutRef.current = setTimeout(() => {
+              connect()
+            }, RECONNECT_INTERVAL)
+          } else {
+            console.log('[WebSocket] Max reconnect attempts reached, giving up')
+          }
+        } catch (error) {
+          console.error('[WebSocket] Error in onclose handler:', error)
         }
       }
 
       ws.onerror = (error) => {
-        console.error('[WebSocket] Connection error:', error)
-        setIsConnected(false)
+        try {
+          console.error('[WebSocket] Connection error:', error)
+          setIsConnected(false)
+        } catch (err) {
+          console.error('[WebSocket] Error in onerror handler:', err)
+        }
       }
 
       ws.onmessage = (event) => {
@@ -131,30 +162,73 @@ export function useWebSocket() {
       wsRef.current = ws
     } catch (error) {
       console.error('[WebSocket] Failed to create WebSocket connection:', error)
-      setIsConnected(false)
+      try {
+        setIsConnected(false)
+        // Don't attempt reconnection if WebSocket creation fails
+        reconnectAttempts.current = MAX_RECONNECT_ATTEMPTS
+      } catch (err) {
+        console.error('[WebSocket] Error setting connection status:', err)
+      }
     }
   }, [setIsConnected, updateMessageCache, showNotification])
 
   const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = null
+    try {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
+      }
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+      setIsConnected(false)
+      reconnectAttempts.current = MAX_RECONNECT_ATTEMPTS
+    } catch (error) {
+      console.error('[WebSocket] Error during disconnect:', error)
     }
-    if (wsRef.current) {
-      wsRef.current.close()
-      wsRef.current = null
-    }
-    setIsConnected(false)
-    reconnectAttempts.current = MAX_RECONNECT_ATTEMPTS
   }, [setIsConnected])
 
   useEffect(() => {
-    connect()
+    // Add delay to prevent immediate connection attempts that might crash
+    const timeoutId = setTimeout(() => {
+      try {
+        connect()
+      } catch (error) {
+        console.error('[WebSocket] Error in useEffect:', error)
+        try {
+          setIsConnected(false)
+        } catch (err) {
+          console.error('[WebSocket] Failed to set disconnected state:', err)
+        }
+      }
+    }, 1000) // 1 second delay
 
     return () => {
-      disconnect()
+      clearTimeout(timeoutId)
+      try {
+        disconnect()
+      } catch (error) {
+        console.error('[WebSocket] Error in cleanup:', error)
+      }
     }
-  }, [connect, disconnect])
+  }, [connect, disconnect, setIsConnected])
 
-  return { connect, disconnect }
+  return { 
+    connect: () => {
+      try {
+        connect()
+      } catch (error) {
+        console.error('[WebSocket] Error in manual connect:', error)
+        setIsConnected(false)
+      }
+    }, 
+    disconnect: () => {
+      try {
+        disconnect()
+      } catch (error) {
+        console.error('[WebSocket] Error in manual disconnect:', error)
+      }
+    }
+  }
 }

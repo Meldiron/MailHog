@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/header'
 import { MessageList } from '@/components/messages/message-list'
 import { MessageDetail } from '@/components/messages/message-detail'
 import { CommandPalette } from '@/components/command-palette'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { useTheme } from '@/hooks/use-theme'
 import { useWebSocket } from '@/hooks/use-websocket'
 import { useKeyboard } from '@/hooks/use-keyboard'
@@ -48,7 +49,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
-        <AppContent />
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
   )

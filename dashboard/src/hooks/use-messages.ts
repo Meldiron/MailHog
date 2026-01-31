@@ -139,12 +139,17 @@ export function useAutoRefresh() {
 
       // Fetch fresh data
       let freshData
-      if (searchQuery.trim()) {
-        console.log('[AutoRefresh] Fetching search results for:', searchQuery)
-        freshData = await searchMessages(searchKind, searchQuery)
-      } else {
-        console.log('[AutoRefresh] Fetching all messages')
-        freshData = await getMessages(0, 50)
+      try {
+        if (searchQuery.trim()) {
+          console.log('[AutoRefresh] Fetching search results for:', searchQuery)
+          freshData = await searchMessages(searchKind, searchQuery)
+        } else {
+          console.log('[AutoRefresh] Fetching all messages')
+          freshData = await getMessages(0, 50)
+        }
+      } catch (fetchError) {
+        console.error('[AutoRefresh] API fetch failed:', fetchError)
+        return // Don't crash, just skip this cycle
       }
       
       console.log('[AutoRefresh] Fetched', freshData.items.length, 'messages (total:', freshData.total, ')')
@@ -152,52 +157,90 @@ export function useAutoRefresh() {
       if (!currentData) {
         // If no current data, just update cache
         console.log('[AutoRefresh] No current data, initializing cache')
-        queryClient.setQueryData(['messages', searchQuery, searchKind], freshData)
-        lastMessageCountRef.current = freshData.total
+        try {
+          queryClient.setQueryData(['messages', searchQuery, searchKind], freshData)
+          lastMessageCountRef.current = freshData.total
+        } catch (cacheError) {
+          console.error('[AutoRefresh] Cache update failed:', cacheError)
+        }
         return
       }
 
       // Check for new messages
-      const currentIds = new Set(currentData.items.map(m => m.ID))
-      const newMessages = freshData.items.filter(m => !currentIds.has(m.ID))
+      try {
+        const currentIds = new Set(currentData.items.map(m => m.ID))
+        const newMessages = freshData.items.filter(m => !currentIds.has(m.ID))
 
-      if (newMessages.length > 0) {
-        console.log('[AutoRefresh] Found', newMessages.length, 'new messages')
-        // Show toast for new messages
-        toast.success(`${newMessages.length} new message${newMessages.length === 1 ? '' : 's'} received`)
-        // Show notifications for new messages
-        newMessages.forEach(message => {
-          console.log('[AutoRefresh] Showing notification for message:', message.ID)
-          showNotification(message)
-        })
-      } else {
-        console.log('[AutoRefresh] No new messages found')
-      }
+        if (newMessages.length > 0) {
+          console.log('[AutoRefresh] Found', newMessages.length, 'new messages')
+          // Show toast for new messages
+          try {
+            toast.success(`${newMessages.length} new message${newMessages.length === 1 ? '' : 's'} received`)
+          } catch (toastError) {
+            console.error('[AutoRefresh] Toast failed:', toastError)
+          }
+          // Show notifications for new messages
+          newMessages.forEach(message => {
+            try {
+              console.log('[AutoRefresh] Showing notification for message:', message.ID)
+              showNotification(message)
+            } catch (notificationError) {
+              console.error('[AutoRefresh] Notification failed for message:', message.ID, notificationError)
+            }
+          })
+        } else {
+          console.log('[AutoRefresh] No new messages found')
+        }
 
-      // Update cache with fresh data
-      queryClient.setQueryData(['messages', searchQuery, searchKind], freshData)
-      lastMessageCountRef.current = freshData.total
+        // Update cache with fresh data
+        try {
+          queryClient.setQueryData(['messages', searchQuery, searchKind], freshData)
+          lastMessageCountRef.current = freshData.total
+        } catch (cacheError) {
+          console.error('[AutoRefresh] Cache update failed:', cacheError)
+        }
 
-      // If there are new messages, also invalidate other queries
-      if (newMessages.length > 0) {
-        console.log('[AutoRefresh] Invalidating other message queries')
-        queryClient.invalidateQueries({ queryKey: ['messages'] })
+        // If there are new messages, also invalidate other queries
+        if (newMessages.length > 0) {
+          try {
+            console.log('[AutoRefresh] Invalidating other message queries')
+            queryClient.invalidateQueries({ queryKey: ['messages'] })
+          } catch (invalidateError) {
+            console.error('[AutoRefresh] Query invalidation failed:', invalidateError)
+          }
+        }
+      } catch (processingError) {
+        console.error('[AutoRefresh] Message processing failed:', processingError)
       }
 
     } catch (error) {
-      console.error('[AutoRefresh] Failed:', error)
+      console.error('[AutoRefresh] Critical error - continuing anyway:', error)
     }
   }, [queryClient, searchQuery, searchKind, showNotification])
 
   useEffect(() => {
-    // Start auto-refresh interval
-    console.log('[AutoRefresh] Starting auto-refresh interval (5 seconds)')
-    intervalRef.current = setInterval(checkForNewMessages, 5000) // 5 seconds
+    try {
+      // Start auto-refresh interval
+      console.log('[AutoRefresh] Starting auto-refresh interval (5 seconds)')
+      intervalRef.current = setInterval(() => {
+        try {
+          checkForNewMessages()
+        } catch (error) {
+          console.error('[AutoRefresh] Error in interval callback:', error)
+        }
+      }, 5000) // 5 seconds
+    } catch (error) {
+      console.error('[AutoRefresh] Error starting interval:', error)
+    }
 
     return () => {
-      if (intervalRef.current) {
-        console.log('[AutoRefresh] Stopping auto-refresh interval')
-        clearInterval(intervalRef.current)
+      try {
+        if (intervalRef.current) {
+          console.log('[AutoRefresh] Stopping auto-refresh interval')
+          clearInterval(intervalRef.current)
+        }
+      } catch (error) {
+        console.error('[AutoRefresh] Error stopping interval:', error)
       }
     }
   }, [checkForNewMessages])
