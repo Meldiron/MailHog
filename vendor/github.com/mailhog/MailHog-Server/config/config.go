@@ -5,6 +5,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	"github.com/ian-kent/envconf"
 	"github.com/mailhog/MailHog-Server/monkey"
@@ -61,6 +62,31 @@ type OutgoingSMTP struct {
 	Username  string
 	Password  string
 	Mechanism string
+}
+
+// GetAllowedOrigin checks if the given origin is allowed by the CORSOrigin config.
+// CORSOrigin can be a single origin or comma-separated list of origins.
+// Returns the matching origin if allowed, empty string otherwise.
+func (c *Config) GetAllowedOrigin(requestOrigin string) string {
+	if len(c.CORSOrigin) == 0 || len(requestOrigin) == 0 {
+		return ""
+	}
+
+	// Split by comma and check each allowed origin
+	allowedOrigins := strings.Split(c.CORSOrigin, ",")
+	for _, allowed := range allowedOrigins {
+		allowed = strings.TrimSpace(allowed)
+		if allowed == requestOrigin {
+			return allowed
+		}
+	}
+
+	return ""
+}
+
+// IsCORSEnabled returns true if CORS is configured
+func (c *Config) IsCORSEnabled() bool {
+	return len(c.CORSOrigin) > 0
 }
 
 var cfg = DefaultConfig()

@@ -28,7 +28,7 @@ func createAPIv2(conf *config.Config, r *pat.Router) *APIv2 {
 	apiv2 := &APIv2{
 		config:      conf,
 		messageChan: make(chan *data.Message),
-		wsHub:       websockets.NewHub(),
+		wsHub:       websockets.NewHub(conf.CORSOrigin),
 	}
 
 	r.Path(conf.WebPath + "/api/v2/messages").Methods("GET").HandlerFunc(apiv2.messages)
@@ -62,10 +62,14 @@ func createAPIv2(conf *config.Config, r *pat.Router) *APIv2 {
 }
 
 func (apiv2 *APIv2) defaultOptions(w http.ResponseWriter, req *http.Request) {
-	if len(apiv2.config.CORSOrigin) > 0 {
-		w.Header().Add("Access-Control-Allow-Origin", apiv2.config.CORSOrigin)
-		w.Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,PUT,POST,DELETE")
-		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	if apiv2.config.IsCORSEnabled() {
+		origin := req.Header.Get("Origin")
+		if allowedOrigin := apiv2.config.GetAllowedOrigin(origin); allowedOrigin != "" {
+			w.Header().Add("Access-Control-Allow-Origin", allowedOrigin)
+			w.Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,PUT,POST,DELETE")
+			w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Add("Vary", "Origin")
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }

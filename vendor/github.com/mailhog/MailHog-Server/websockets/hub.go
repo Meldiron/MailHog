@@ -2,6 +2,7 @@ package websockets
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/ian-kent/go-log/log"
@@ -15,20 +16,39 @@ type Hub struct {
 	unregisterChan chan *connection
 }
 
-func NewHub() *Hub {
+// NewHub creates a new Hub. corsOrigin can be empty (allow all),
+// a single origin, or comma-separated list of allowed origins.
+func NewHub(corsOrigin string) *Hub {
 	hub := &Hub{
-		upgrader: websocket.Upgrader{
-			ReadBufferSize:  256,
-			WriteBufferSize: 4096,
-			CheckOrigin: func(r *http.Request) bool {
-				return true
-			},
-		},
 		connections:    make(map[*connection]bool),
 		messages:       make(chan interface{}),
 		registerChan:   make(chan *connection),
 		unregisterChan: make(chan *connection),
 	}
+
+	hub.upgrader = websocket.Upgrader{
+		ReadBufferSize:  256,
+		WriteBufferSize: 4096,
+		CheckOrigin: func(r *http.Request) bool {
+			// If no CORS origin configured, allow all
+			if len(corsOrigin) == 0 {
+				return true
+			}
+			origin := r.Header.Get("Origin")
+			if len(origin) == 0 {
+				return true
+			}
+			// Check if origin is in the allowed list
+			allowedOrigins := strings.Split(corsOrigin, ",")
+			for _, allowed := range allowedOrigins {
+				if strings.TrimSpace(allowed) == origin {
+					return true
+				}
+			}
+			return false
+		},
+	}
+
 	go hub.run()
 	return hub
 }
