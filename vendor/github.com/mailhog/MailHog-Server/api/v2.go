@@ -67,6 +67,7 @@ func (apiv2 *APIv2) defaultOptions(w http.ResponseWriter, req *http.Request) {
 		w.Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,PUT,POST,DELETE")
 		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 type messagesResult struct {

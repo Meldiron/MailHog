@@ -89,6 +89,7 @@ func (apiv1 *APIv1) defaultOptions(w http.ResponseWriter, req *http.Request) {
 		w.Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
 		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (apiv1 *APIv1) broadcast(json string) {
