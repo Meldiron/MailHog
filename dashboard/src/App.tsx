@@ -8,6 +8,8 @@ import { CommandPalette } from '@/components/command-palette'
 import { useTheme } from '@/hooks/use-theme'
 import { useWebSocket } from '@/hooks/use-websocket'
 import { useKeyboard } from '@/hooks/use-keyboard'
+import { useNotifications } from '@/hooks/use-notifications'
+import { useAutoRefresh } from '@/hooks/use-messages'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +24,8 @@ function AppContent() {
   useTheme()
   useWebSocket()
   useKeyboard()
+  useNotifications()
+  useAutoRefresh()
 
   return (
     <div className="flex flex-col h-screen">

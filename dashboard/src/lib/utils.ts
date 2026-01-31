@@ -37,3 +37,39 @@ export function truncate(str: string, length: number): string {
   if (str.length <= length) return str
   return str.slice(0, length) + '...'
 }
+
+export function decodeQuotedPrintable(encoded: string): string {
+  // Handle quoted-printable decoding
+  return encoded
+    .replace(/=\r?\n/g, '') // Remove soft line breaks (= at end of line)
+    .replace(/=([0-9A-F]{2})/gi, (_, hex) => {
+      // Convert =XX hex codes to characters
+      return String.fromCharCode(parseInt(hex, 16))
+    })
+}
+
+export function decodeBase64(encoded: string): string {
+  try {
+    // Handle base64 decoding
+    return atob(encoded)
+  } catch (error) {
+    console.warn('Failed to decode base64 content:', error)
+    return encoded // Return original if decoding fails
+  }
+}
+
+export function decodeContent(content: string, encoding: string): string {
+  const normalizedEncoding = encoding.toLowerCase().trim()
+  
+  switch (normalizedEncoding) {
+    case 'quoted-printable':
+      return decodeQuotedPrintable(content)
+    case 'base64':
+      return decodeBase64(content)
+    case '7bit':
+    case '8bit':
+    case 'binary':
+    default:
+      return content
+  }
+}

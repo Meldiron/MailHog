@@ -1,12 +1,11 @@
 import { useEffect, useCallback } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useUIStore } from '@/stores/ui-store'
-import { useMessages, useDeleteMessage } from '@/hooks/use-messages'
+import { useMessages, useDeleteMessage, useRefreshMessages } from '@/hooks/use-messages'
 
 export function useKeyboard() {
-  const queryClient = useQueryClient()
   const { data } = useMessages()
   const deleteMutation = useDeleteMessage()
+  const { refresh: refreshMessages } = useRefreshMessages()
   const {
     selectedMessageId,
     setSelectedMessageId,
@@ -44,9 +43,7 @@ export function useKeyboard() {
     }
   }, [messages, selectedMessageId, setSelectedMessageId])
 
-  const refreshMessages = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['messages'] })
-  }, [queryClient])
+
 
   const deleteSelectedMessage = useCallback(() => {
     if (selectedMessageId) {

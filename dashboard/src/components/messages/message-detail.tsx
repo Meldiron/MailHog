@@ -1,4 +1,4 @@
-import { Download, Trash2, Mail, Copy, Check, Server } from 'lucide-react'
+import { Download, Trash2, Mail, Copy, Check, Server, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useMessage, useDeleteMessage } from '@/hooks/use-messages'
 import { useUIStore } from '@/stores/ui-store'
-import { formatDate } from '@/lib/utils'
+import { formatDate, decodeContent } from '@/lib/utils'
 import type { Message, MIMEPart } from '@/api/types'
 
 function DetailSkeleton() {
@@ -184,19 +184,27 @@ function getSubject(message: Message): string {
 function getPlainTextBody(message: Message): string {
   if (message.MIME?.Parts) {
     const plainPart = findMimePart(message.MIME.Parts, 'text/plain')
-    if (plainPart) return plainPart.Body
+    if (plainPart) {
+      const encoding = plainPart.Headers['Content-Transfer-Encoding']?.[0] || ''
+      return decodeContent(plainPart.Body, encoding)
+    }
   }
-  return message.Content.Body
+  const encoding = message.Content.Headers['Content-Transfer-Encoding']?.[0] || ''
+  return decodeContent(message.Content.Body, encoding)
 }
 
 function getHtmlBody(message: Message): string | null {
   if (message.MIME?.Parts) {
     const htmlPart = findMimePart(message.MIME.Parts, 'text/html')
-    if (htmlPart) return htmlPart.Body
+    if (htmlPart) {
+      const encoding = htmlPart.Headers['Content-Transfer-Encoding']?.[0] || ''
+      return decodeContent(htmlPart.Body, encoding)
+    }
   }
   const contentType = message.Content.Headers['Content-Type']?.[0] || ''
   if (contentType.includes('text/html')) {
-    return message.Content.Body
+    const encoding = message.Content.Headers['Content-Transfer-Encoding']?.[0] || ''
+    return decodeContent(message.Content.Body, encoding)
   }
   return null
 }
@@ -289,6 +297,10 @@ export function MessageDetail() {
     URL.revokeObjectURL(url)
   }
 
+  const handleClose = () => {
+    setSelectedMessageId(null)
+  }
+
   const handleDelete = () => {
     deleteMutation.mutate(message.ID, {
       onSuccess: () => {
@@ -314,6 +326,15 @@ export function MessageDetail() {
             </p>
           </div>
           <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={handleClose}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Close (Esc)</TooltipContent>
+            </Tooltip>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" onClick={handleDownload}>

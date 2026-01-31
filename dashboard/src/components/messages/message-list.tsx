@@ -1,4 +1,5 @@
 import { RefreshCw, Trash2 } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -19,9 +20,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { MessageItem } from './message-item'
-import { useMessages, useDeleteAllMessages } from '@/hooks/use-messages'
+import { useMessages, useDeleteAllMessages, useRefreshMessages } from '@/hooks/use-messages'
 import { useUIStore } from '@/stores/ui-store'
-import { useQueryClient } from '@tanstack/react-query'
+
 
 function MessageListSkeleton() {
   return (
@@ -72,14 +73,10 @@ function EmptyState() {
 }
 
 export function MessageList() {
-  const queryClient = useQueryClient()
   const { data, isLoading, isError, error } = useMessages()
   const deleteAllMutation = useDeleteAllMessages()
   const { selectedMessageId, setSelectedMessageId } = useUIStore()
-
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['messages'] })
-  }
+  const { refresh: handleRefresh, isRefreshing } = useRefreshMessages()
 
   const handleDeleteAll = () => {
     deleteAllMutation.mutate()
@@ -101,14 +98,16 @@ export function MessageList() {
                 variant="ghost"
                 size="icon"
                 onClick={handleRefresh}
-                disabled={isLoading}
+                disabled={isLoading || isRefreshing}
               >
                 <RefreshCw
-                  className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+                  className={`h-4 w-4 ${(isLoading || isRefreshing) ? 'animate-spin' : ''}`}
                 />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Refresh (R)</TooltipContent>
+            <TooltipContent>
+              {isRefreshing ? 'Refreshing...' : 'Refresh (R)'}
+            </TooltipContent>
           </Tooltip>
 
           <AlertDialog>
@@ -159,9 +158,13 @@ export function MessageList() {
               variant="outline"
               size="sm"
               onClick={handleRefresh}
+              disabled={isLoading || isRefreshing}
               className="mt-3"
             >
-              Try again
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${(isLoading || isRefreshing) ? 'animate-spin' : ''}`}
+              />
+              {isRefreshing ? 'Refreshing...' : 'Try again'}
             </Button>
           </div>
         ) : messages.length === 0 ? (

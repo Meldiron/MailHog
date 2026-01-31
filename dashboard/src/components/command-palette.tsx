@@ -9,6 +9,7 @@ import {
   BellOff,
   ArrowDown,
   ArrowUp,
+  X,
   Github,
 } from 'lucide-react'
 import {
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/command'
 import { useUIStore } from '@/stores/ui-store'
 import { useKeyboard } from '@/hooks/use-keyboard'
-import { useDeleteAllMessages } from '@/hooks/use-messages'
+import { useDeleteAllMessages, useRefreshMessages } from '@/hooks/use-messages'
 import { useTheme } from '@/hooks/use-theme'
 
 export function CommandPalette() {
@@ -33,15 +34,16 @@ export function CommandPalette() {
     notificationsEnabled,
     setNotificationsEnabled,
     selectedMessageId,
+    setSelectedMessageId,
   } = useUIStore()
   const { theme, setTheme } = useTheme()
   const {
     selectNextMessage,
     selectPreviousMessage,
-    refreshMessages,
     deleteSelectedMessage,
     focusSearch,
   } = useKeyboard()
+  const { refresh: refreshMessages, isRefreshing } = useRefreshMessages()
   const deleteAllMutation = useDeleteAllMessages()
 
   const runCommand = (command: () => void) => {
@@ -76,17 +78,24 @@ export function CommandPalette() {
         <CommandSeparator />
 
         <CommandGroup heading="Actions">
-          <CommandItem onSelect={() => runCommand(refreshMessages)}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh messages
+          <CommandItem onSelect={() => runCommand(refreshMessages)} disabled={isRefreshing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing messages...' : 'Refresh messages'}
             <CommandShortcut>R</CommandShortcut>
           </CommandItem>
           {selectedMessageId && (
-            <CommandItem onSelect={() => runCommand(deleteSelectedMessage)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete selected message
-              <CommandShortcut>D</CommandShortcut>
-            </CommandItem>
+            <>
+              <CommandItem onSelect={() => runCommand(() => setSelectedMessageId(null))}>
+                <X className="mr-2 h-4 w-4" />
+                Close message
+                <CommandShortcut>Esc</CommandShortcut>
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(deleteSelectedMessage)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete selected message
+                <CommandShortcut>D</CommandShortcut>
+              </CommandItem>
+            </>
           )}
           <CommandItem
             onSelect={() => runCommand(() => deleteAllMutation.mutate())}
