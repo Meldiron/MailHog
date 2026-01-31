@@ -87,7 +87,7 @@ func (apiv1 *APIv1) defaultOptions(w http.ResponseWriter, req *http.Request) {
 	if len(apiv1.config.CORSOrigin) > 0 {
 		w.Header().Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
 		w.Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
-		w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	}
 }
 
