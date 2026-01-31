@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { getWebSocketUrl, AUTH_HEADER } from '@/api/client'
+import { getWebSocketUrl } from '@/api/client'
 import { useUIStore } from '@/stores/ui-store'
 import type { Message } from '@/api/types'
 
@@ -72,12 +72,8 @@ export function useWebSocket() {
     if (wsRef.current?.readyState === WebSocket.OPEN) return
 
     const wsUrl = getWebSocketUrl()
-    const credentials = atob(AUTH_HEADER.replace('Basic ', ''))
-    const [username, password] = credentials.split(':')
 
     const urlWithAuth = new URL(wsUrl)
-    urlWithAuth.username = username
-    urlWithAuth.password = password
 
     try {
       const ws = new WebSocket(urlWithAuth.toString())
