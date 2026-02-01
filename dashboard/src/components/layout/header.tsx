@@ -1,4 +1,4 @@
-import { Mail, Moon, Sun, Monitor, Github, Search, Bell, BellOff } from 'lucide-react'
+import { Mail, Moon, Sun, Monitor, Github, Search, Bell, BellOff, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -17,6 +17,7 @@ import {
 import { ConnectionStatus } from '@/components/connection-status'
 import { useTheme } from '@/hooks/use-theme'
 import { useUIStore } from '@/stores/ui-store'
+import { useAuthStore } from '@/stores/auth-store'
 import type { SearchKind } from '@/api/types'
 
 const SEARCH_KINDS: { value: SearchKind; label: string }[] = [
@@ -36,6 +37,7 @@ export function Header() {
     notificationsEnabled,
     setNotificationsEnabled,
   } = useUIStore()
+  const { email, logout } = useAuthStore()
 
   const handleNotificationToggle = async () => {
     if (!notificationsEnabled) {
@@ -172,6 +174,17 @@ export function Header() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>View on GitHub</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={logout}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Sign out{email ? ` (${email})` : ''}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>

@@ -6,11 +6,13 @@ import { MessageList } from '@/components/messages/message-list'
 import { MessageDetail } from '@/components/messages/message-detail'
 import { CommandPalette } from '@/components/command-palette'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { LoginPage } from '@/components/auth/login-page'
 import { useTheme } from '@/hooks/use-theme'
 import { useWebSocket } from '@/hooks/use-websocket'
 import { useKeyboard } from '@/hooks/use-keyboard'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useAutoRefresh } from '@/hooks/use-messages'
+import { useAuthStore } from '@/stores/auth-store'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,11 +48,13 @@ function AppContent() {
 }
 
 function App() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
         <ErrorBoundary>
-          <AppContent />
+          {isAuthenticated ? <AppContent /> : <LoginPage />}
         </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>

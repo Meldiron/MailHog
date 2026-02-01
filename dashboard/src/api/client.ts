@@ -1,3 +1,5 @@
+import { getBasicAuthHeader } from '@/stores/auth-store'
+
 const API_BASE_URL = 'https://appwrite-mailhog-api.up.railway.app'
 
 export async function apiClient<T>(
@@ -6,8 +8,10 @@ export async function apiClient<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
 
+  const authHeader = getBasicAuthHeader()
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    ...(authHeader && { Authorization: authHeader }),
     ...options.headers,
   }
 
