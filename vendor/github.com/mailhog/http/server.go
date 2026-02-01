@@ -103,6 +103,12 @@ func BasicAuthHandler(h http.Handler) http.Handler {
 			return
 		}
 
+		// Skip auth for CORS preflight requests
+		if req.Method == "OPTIONS" {
+			h.ServeHTTP(w, req)
+			return
+		}
+
 		u, pw, ok := req.BasicAuth()
 		if !ok || !Authorised(u, pw) {
 			w.Header().Set("WWW-Authenticate", "Basic")
