@@ -51,3 +51,10 @@ export function getBasicAuthHeader(): string | null {
   const encoded = btoa(`${credentials.email}:${credentials.password}`)
   return `Basic ${encoded}`
 }
+
+export function getAuthQueryParams(): string {
+  const credentials = getStoredCredentials()
+  if (!credentials) return ''
+
+  return `u=${encodeURIComponent(credentials.email)}&p=${encodeURIComponent(credentials.password)}`
+}

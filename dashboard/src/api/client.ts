@@ -1,4 +1,4 @@
-import { getBasicAuthHeader } from '@/stores/auth-store'
+import { getBasicAuthHeader, getAuthQueryParams } from '@/stores/auth-store'
 
 const API_BASE_URL = 'https://appwrite-mailhog-api.up.railway.app'
 
@@ -34,7 +34,9 @@ export async function apiClient<T>(
 export function getWebSocketUrl(): string {
   const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss' : 'ws'
   const baseWithoutProtocol = API_BASE_URL.replace(/^https?:\/\//, '')
-  return `${wsProtocol}://${baseWithoutProtocol}/api/v2/websocket`
+  const authParams = getAuthQueryParams()
+  const queryString = authParams ? `?${authParams}` : ''
+  return `${wsProtocol}://${baseWithoutProtocol}/api/v2/websocket${queryString}`
 }
 
 export { API_BASE_URL }

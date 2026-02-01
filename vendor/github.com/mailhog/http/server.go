@@ -109,13 +109,23 @@ func BasicAuthHandler(h http.Handler) http.Handler {
 			return
 		}
 
+		// Try Basic Auth header first
 		u, pw, ok := req.BasicAuth()
-		if !ok || !Authorised(u, pw) {
-			w.Header().Set("WWW-Authenticate", "Basic")
-			w.WriteHeader(401)
+		if ok && Authorised(u, pw) {
+			h.ServeHTTP(w, req)
 			return
 		}
-		h.ServeHTTP(w, req)
+
+		// Fall back to query parameters (for WebSocket connections)
+		u = req.URL.Query().Get("u")
+		pw = req.URL.Query().Get("p")
+		if u != "" && pw != "" && Authorised(u, pw) {
+			h.ServeHTTP(w, req)
+			return
+		}
+
+		w.Header().Set("WWW-Authenticate", "Basic")
+		w.WriteHeader(401)
 	}
 
 	return http.HandlerFunc(f)
